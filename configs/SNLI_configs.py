@@ -197,7 +197,7 @@ class MambaNetWork_config(HEBT_GRC_config):
         self.trainDataDim = self.input_size
         self.lobeLabelDim = self.input_size
         self.labelDataDim = self.input_size
-        self.hiddenDim = 300
+        self.hiddenDim = 10
         self.layerNum = 1
         self.kernelSize = 3
         self.padNum = 1
