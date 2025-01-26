@@ -675,14 +675,14 @@ class SimpleLstmNetWork(nn.Module):
         self.trainModule = nn.LSTM(hiddenDim, hiddenDim, layerNum, bidirectional = self.isBidirectional, batch_first = isBatchFirst).to(self.device)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropRate)
-        self.transInputDataDim = nn.Linear(trainDataDim, hiddenDim)
-        self.transDataNum = nn.Linear(self.layerNum * self.directionNum, 1)
-        self.transBiDim = nn.Linear(self.directionNum * self.hiddenDim, self.hiddenDim)
+        self.input2HiddenDim = nn.Linear(trainDataDim, hiddenDim)
+        self.direction2One = nn.Linear(self.layerNum * self.directionNum, 1)
+        self.biHidden2HiddenDim = nn.Linear(self.directionNum * self.hiddenDim, self.hiddenDim)
 
     def forward(self, inputData, inputMask):
         #print(f"SimpleLstmNetWork inputData = {inputData.shape}")
         if (inputData.shape[2] == self.trainDataDim):
-            inputData = self.transInputDataDim(inputData)
+            inputData = self.input2HiddenDim(inputData)
         '''
         oriDataNum = 0
         if (inputData.shape[0] < 2 * self.batchSize):
@@ -706,14 +706,14 @@ class SimpleLstmNetWork(nn.Module):
             cn = cn.transpose(0, 1)
         if (self.layerNum > 1) or (self.directionNum > 1):
             hn = hn.transpose(1, 2)
-            hn = self.transDataNum(hn)
+            hn = self.direction2One(hn)
             hn = hn.transpose(1, 2)
 
             cn = cn.transpose(1, 2)
-            cn = self.transDataNum(cn)
+            cn = self.direction2One(cn)
             cn = cn.transpose(1, 2)
 
-        out = self.transBiDim(out)
+        out = self.biHidden2HiddenDim(out)
         '''
         if (oriDataNum != 0):
             out = out[0 : oriDataNum, : , : ]
@@ -2496,7 +2496,7 @@ class S6(nn.Module):
             return y
 
 class MambaBlock(nn.Module):
-    def __init__(self, trainDataNum, trainDataDim, hiddenDim, batchSize):
+    def __init__(self, trainDataNum, trainDataDim, hiddenDim, batchSize, kernelSize, padNum):
         super(MambaBlock, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.inp_proj = nn.Linear(trainDataDim, 2 * trainDataDim, device = self.device)
@@ -2509,7 +2509,7 @@ class MambaBlock(nn.Module):
         nn.init.constant_(self.out_proj.bias, 1.0)
         self.S6 = S6(trainDataNum, 2 * trainDataDim, hiddenDim, batchSize)
         # Add 1D convolution with kernel size 3
-        self.conv = nn.Conv1d(trainDataNum, trainDataNum, kernel_size = 3, padding = 1, device = self.device)
+        self.conv = nn.Conv1d(trainDataNum, trainDataNum, kernel_size = kernelSize, padding = padNum, device = self.device)
         # Add linear layer for conv output
         self.conv_linear = nn.Linear(2 * trainDataDim, 2 * trainDataDim, device = self.device)
         # rmsnorm
@@ -2538,21 +2538,81 @@ class MambaBlock(nn.Module):
         return x_out
 
 class MambaNetWork(nn.Module):
-    def __init__(self, trainDataNum, trainDataDim, hiddenDim, batchSize):
+    def __init__(self, config):
         super(MambaNetWork, self).__init__()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.config = config
+        self.taskName = config["taskName"]
+        self.batchSize = config["batchSize"]
+        self.trainDataNum = config["trainDataNum"]
+        self.trainDataDim = config["trainDataDim"]
+        self.labelDataDim = config["labelDataDim"]
+        self.hiddenDim = config["hiddenDim"]
+        self.layerNum = config["layerNum"]
+        self.resDropRate = config["resDropRate"]
+        self.kernelSize = config["kernelSize"]
+        self.padNum = config["padNum"]
+        self.manualSeed = config["manualSeed"]
+
         global curBatchSize
         curBatchSize = 0
         global DIFFERENT_H_STATES_RECURRENT_UPDATE_MECHANISM
         DIFFERENT_H_STATES_RECURRENT_UPDATE_MECHANISM = 0
-        self.mambaBlock1 = MambaBlock(trainDataNum, trainDataDim, hiddenDim, batchSize)
-        self.mambaBlock2 = MambaBlock(trainDataNum, trainDataDim, hiddenDim, batchSize)
-        self.mambaBlock3 = MambaBlock(trainDataNum, trainDataDim, hiddenDim, batchSize)
+        self.mambaBlock1 = MambaBlock(self.trainDataNum, self.trainDataDim, self.hiddenDim, self.batchSize, self.kernelSize, self.padNum)
+        self.mambaBlock2 = MambaBlock(self.trainDataNum, self.trainDataDim, self.hiddenDim, self.batchSize, self.kernelSize, self.padNum)
+        self.mambaBlock3 = MambaBlock(self.trainDataNum, self.trainDataDim, self.hiddenDim, self.batchSize, self.kernelSize, self.padNum)
+        self.mambaTrainDataNum2One = nn.Linear(self.trainDataNum, 1)
+        self.summerizeModule = SimpleLstmNetWork(self.taskName, True, False, False, False, self.trainDataDim, self.labelDataDim, self.hiddenDim, self.layerNum, self.batchSize, self.resDropRate)
+        self.hidden2LabelDim = nn.Linear(self.hiddenDim, self.labelDataDim)
 
-    def forward(self, x):
-        x = self.mambaBlock1(x)
-        x = self.mambaBlock2(x)
-        x = self.mambaBlock3(x)
-        return x
+    def forward(self, sequence, input_mask):
+        #print(f"MambaNetWork sequence = {sequence.shape}, input_mask = {input_mask.shape}")
+        random.seed(42)
+        np.random.seed(42)
+        torch.manual_seed(42)
+        torch.cuda.manual_seed(42)
+        inputData = sequence
+        mambaOutput = None
+        while (sequence.shape[1] > self.trainDataNum):
+            tempSeq = sequence[ : , 0 : self.trainDataNum, : ]
+            sequence = sequence[ : , self.trainDataNum : , : ]
+            #print(f"MambaNetWork tempSeq = {tempSeq.shape}")
+            tempMambaOutput = self.HandleMambaBlock(tempSeq)
+            #print(f"MambaNetWork tempMambaOutput = {tempMambaOutput.shape}")
+            mambaOutput = AddDataToTorch(mambaOutput, tempMambaOutput, 1)
+        if (sequence.shape[1] <= self.trainDataNum):
+            sequence = self.pad_sequences_3d(sequence, self.trainDataNum)
+            #print(f"MambaNetWork pad sequence = {sequence.shape}")
+            tempMambaOutput = self.HandleMambaBlock(sequence)
+            #print(f"MambaNetWork pad tempMambaOutput = {tempMambaOutput.shape}")
+            mambaOutput = AddDataToTorch(mambaOutput, tempMambaOutput, 1)
+        _, (finalOutput, _) = self.summerizeModule(mambaOutput, None)
+        finalOutput = self.hidden2LabelDim(finalOutput)
+        finalOutput = finalOutput.squeeze(1)
+
+        return {"sequence": inputData,
+        "global_state": finalOutput,
+        "input_mask": input_mask,
+        "aux_loss": None}
+
+    def pad_sequences_3d(self, sequences, max_len = None, pad_value = 0):
+        # Assuming sequences is a tensor of shape (batch_size, seq_len, feature_size)
+        batch_size, seq_len, feature_size = sequences.shape
+        if max_len is None:
+            max_len = seq_len + 1
+        # Initialize padded_sequences with the pad_value
+        padded_sequences = torch.full((batch_size, max_len, feature_size), fill_value = pad_value, dtype = sequences.dtype, device = sequences.device)
+        # Pad each sequence to the max_len
+        padded_sequences[ : , : seq_len, : ] = sequences
+        return padded_sequences
+    def HandleMambaBlock(self, sequence):
+        sequence = self.mambaBlock1(sequence)
+        sequence = self.mambaBlock2(sequence)
+        sequence = self.mambaBlock3(sequence)
+        sequence = sequence.transpose(1, 2)
+        sequence = self.mambaTrainDataNum2One(sequence)
+        sequence = sequence.transpose(1, 2)
+        return sequence
 
     def SetTrainDataInfo(self, inputData, labelData):
         data = TensorDataset(inputData.to(self.device), labelData.to(self.device))

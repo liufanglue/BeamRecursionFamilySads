@@ -2,9 +2,9 @@ class optimizer_config:
     def __init__(self):
         # optimizer config
         self.max_grad_norm = 5
-        self.batch_size = 64
-        self.train_batch_size = 64
-        self.dev_batch_size = 64
+        self.batch_size = 128
+        self.train_batch_size = 128
+        self.dev_batch_size = 128
         self.bucket_size_factor = 10
         self.DataParallel = False
         self.num_workers = 4
@@ -167,4 +167,28 @@ class SadsNetWork_config(HEBT_GRC_config):
         self.batchSize = self.batch_size * 2
         self.learnRate = 1e-3
         self.weightDecay = 1e-8
+
+class MambaNetWork_config(HEBT_GRC_config):
+    def __init__(self):
+        super().__init__()
+        self.encoder_type = "MambaNetWork"
+        self.model_name = "(MambaNetWork)"
+        self.taskName = "mnli"
+        self.isBatchFirst = True
+        self.isNeedHidden = False
+        self.isBiDirectional = True
+        self.trainDataNum = 100
+        self.trainDataDim = self.input_size
+        self.lobeLabelDim = self.input_size
+        self.labelDataDim = self.input_size
+        self.hiddenDim = 300
+        self.layerNum = 1
+        self.kernelSize = 3
+        self.padNum = 1
+        self.manualSeed = 42
+        self.resDropRate = 0.05
+        self.batchSize = self.batch_size
+        self.learnRate = 1e-3
+        self.weightDecay = 1e-8
+
 
