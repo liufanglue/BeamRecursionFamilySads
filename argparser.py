@@ -24,7 +24,7 @@ def get_args():
                                  "HEBT_GRC", "HEBT_GRC_noSSM",
                                  "HEBT_GRC_noRBA", "HEBT_GRC_small", "HEBT_GRC_random",
                                  "HEBT_GRC_chunk20", "HEBT_GRC_chunk10",
-                                 "CRvNN_nohalt","MEGA", "RecurrentRnnNetWork", "SadsNetWork"])
+                                 "CRvNN_nohalt","MEGA", "RecurrentRnnNetWork", "SadsNetWork", "MambaNetWork"])
     parser.add_argument('--no_display', type=str2bool, default=False, const=True, nargs='?')
     parser.add_argument('--display_params', type=str2bool, default=True, const=True, nargs='?')
     parser.add_argument('--test', type=str2bool, default=False, const=True, nargs='?')
