@@ -11,7 +11,7 @@ class optimizer_config:
         self.weight_decay = 1e-2
         self.lr = 1e-3
         self.epochs = 100
-        self.early_stop_patience = 5
+        self.early_stop_patience = 10
         self.scheduler = "ReduceLROnPlateau"
         self.scheduler_patience = 2
         self.scheduler_reduce_factor = 0.5
@@ -124,16 +124,16 @@ class SadsNetWork_config(HEBT_GRC_config):
         self.hiddenDim = 300
         self.layerNum = 1
         self.maxSeqLen = 30
-        self.splitPartNum = 20
+        self.splitPartNum = 25
         self.crossLenRate = 0.01
         self.maxLevelNum = 6
         self.cacheSize = 4
         self.maxLoopCount = 1
         self.manualSeed = 42
-        self.resDropRate = 0.05
+        self.resDropRate = 0.2
         self.batchSize = self.batch_size
         self.learnRate = 1e-3
-        self.weightDecay = 1e-8
+        self.weightDecay = 1e-2
 
 class MambaNetWork_config(HEBT_GRC_config):
     def __init__(self):

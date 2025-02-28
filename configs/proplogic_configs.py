@@ -224,18 +224,18 @@ class SadsNetWork_config(HEBT_GRC_config):
         self.lobeLabelDim = self.input_size
         self.labelDataDim = self.input_size
         self.hiddenDim = 300
-        self.layerNum = 1
+        self.layerNum = 2
         self.maxSeqLen = 30
-        self.splitPartNum = 20
+        self.splitPartNum = 25
         self.crossLenRate = 0.01
         self.maxLevelNum = 6
         self.cacheSize = 4
         self.maxLoopCount = 1
         self.manualSeed = 42
-        self.resDropRate = 0.05
+        self.resDropRate = 0.2
         self.batchSize = self.batch_size * 2
         self.learnRate = 1e-3
-        self.weightDecay = 1e-8
+        self.weightDecay = 1e-2
 
 class MambaNetWork_config(HEBT_GRC_config):
     def __init__(self):
