@@ -85,7 +85,7 @@ class TransTorchToCsv:
             print(r'TransTorchToCsv path exist')
             return
         if len(torchData.shape) != 2:
-            print(r'torchData shape = {torchData.shape()}')
+            print(r'torchData shape = {torchData.shape}')
             return
         fileCsv = codecs.open(filePath, 'w+', codeFormat)  # 追加
         writer = csv.writer(fileCsv, delimiter = csvDelimi, quotechar = ' ', quoting = csv.QUOTE_MINIMAL)
